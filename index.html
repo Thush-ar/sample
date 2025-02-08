@@ -1,95 +1,196 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal Website</title>
+    <title>Flappy Bird</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            line-height: 1.6;
-        }
-
         body {
-            background: #f8f9fa;
-            color: #212529;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        nav {
-            margin: 2rem 0;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        nav ul {
-            list-style: none;
+            margin: 0;
             display: flex;
             justify-content: center;
-            gap: 2rem;
-            padding: 1rem 0;
+            background: #87CEEB;
+            touch-action: manipulation;
         }
 
-        main {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
         }
 
-        footer {
-            text-align: center;
-            margin-top: 3rem;
-            color: #6c757d;
+        #game-canvas {
+            border: 2px solid #2c3e50;
+            background: #4ec0ca;
+        }
+
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font: 40px Arial;
+            color: white;
+            text-shadow: 2px 2px 2px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Simple Design</h1>
-            <p>A minimal website template</p>
-        </header>
-
-        <nav>
-            <ul>
-                <li><a href="#">Home</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Contact</a></li>
-            </ul>
-        </nav>
-
-        <main>
-            <article>
-                <h2>Welcome</h2>
-                <p>This clean layout uses semantic HTML5 elements and modern CSS features while maintaining simplicity. The responsive design adapts to all screen sizes.</p>
-                
-                <section>
-                    <h3>Features</h3>
-                    <ul>
-                        <li>Mobile-first approach</li>
-                        <li>CSS Grid/Flexbox layout</li>
-                        <li>Subtle shadows and spacing</li>
-                    </ul>
-                </section>
-            </article>
-        </main>
-
-        <footer>
-            <p>&copy; 2024 Minimal Website. All rights reserved.</p>
-        </footer>
+    <div id="game-container">
+        <canvas id="game-canvas" width="400" height="600"></canvas>
+        <div id="score">0</div>
     </div>
+
+<script>
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+
+// Game state
+let bird = {
+    x: 50,
+    y: 300,
+    size: 30,
+    velocity: 0,
+    gravity: 0.5,
+    jump: -8
+};
+
+let pipes = [];
+let score = 0;
+let gameLoop;
+let isPlaying = false;
+
+// Game parameters
+const pipeGap = 150;
+const pipeWidth = 60;
+const pipeSpacing = 200;
+
+function drawBird() {
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(bird.x, bird.y, bird.size, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawPipe(pipe) {
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
+}
+
+function createPipe() {
+    const minHeight = 50;
+    const maxHeight = canvas.height - pipeGap - minHeight;
+    const height = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+
+    pipes.push({
+        x: canvas.width,
+        y: 0,
+        width: pipeWidth,
+        height: height
+    }, {
+        x: canvas.width,
+        y: height + pipeGap,
+        width: pipeWidth,
+        height: canvas.height - height - pipeGap
+    });
+}
+
+function checkCollision(pipe) {
+    return bird.x + bird.size > pipe.x &&
+           bird.x - bird.size < pipe.x + pipe.width &&
+           bird.y + bird.size > pipe.y &&
+           bird.y - bird.size < pipe.y + pipe.height;
+}
+
+function update() {
+    if (!isPlaying) return;
+
+    // Bird physics
+    bird.velocity += bird.gravity;
+    bird.y += bird.velocity;
+
+    // Pipe logic
+    pipes.forEach(pipe => {
+        pipe.x -= 2;
+
+        if (checkCollision(pipe)) {
+            gameOver();
+            return;
+        }
+    });
+
+    // Score counting
+    if (pipes[0] && pipes[0].x + pipes[0].width < bird.x - bird.size) {
+        score++;
+        scoreElement.textContent = score;
+        pipes.splice(0, 2);
+    }
+
+    // Generate new pipes
+    if (pipes.length === 0 || pipes[pipes.length-1].x < canvas.width - pipeSpacing) {
+        createPipe();
+    }
+
+    // Boundary check
+    if (bird.y + bird.size > canvas.height || bird.y - bird.size < 0) {
+        gameOver();
+    }
+
+    draw();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw pipes
+    pipes.forEach(pipe => drawPipe(pipe));
+    
+    // Draw bird
+    drawBird();
+}
+
+function gameOver() {
+    isPlaying = false;
+    cancelAnimationFrame(gameLoop);
+    alert(`Game Over! Score: ${score}`);
+    resetGame();
+}
+
+function resetGame() {
+    bird.y = 300;
+    bird.velocity = 0;
+    pipes = [];
+    score = 0;
+    scoreElement.textContent = '0';
+}
+
+function startGame() {
+    if (!isPlaying) {
+        isPlaying = true;
+        gameLoop = requestAnimationFrame(function animate() {
+            update();
+            gameLoop = requestAnimationFrame(animate);
+        });
+    }
+}
+
+// Controls
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        if (!isPlaying) startGame();
+        bird.velocity = bird.jump;
+    }
+});
+
+canvas.addEventListener('click', () => {
+    if (!isPlaying) startGame();
+    bird.velocity = bird.jump;
+});
+
+// Initial setup
+ctx.font = "30px Arial";
+ctx.fillStyle = "white";
+ctx.textAlign = "center";
+ctx.fillText("Click or press SPACE to start", canvas.width/2, canvas.height/2);
+</script>
 </body>
 </html>
+
